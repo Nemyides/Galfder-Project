@@ -14,37 +14,49 @@
           <h2>AI консультант</h2>
         </div>
 
-        <div class="message user-message">
-          <p>Какие пункты обязательны при заключении договора с Эр-телеком?</p>
-        </div>
-
-        <div class="message ai-message">
-          <div class="ai-label">AI</div>
-          <p>
-            Вот перечень пунктов, которые необходимы при заключении договора с
-            Эр-Телеком:
-          </p>
-          <ul class="document-list">
-            <li>Пункт 1.2: Текст текст текст...</li>
-            <li>Пункт 1.2: Текст текст текст...</li>
-            <li>Пункт 1.2: Текст текст текст...</li>
-            <li>Пункт 1.2: Текст текст текст...</li>
-            <li>Пункт 1.2: Текст текст текст...</li>
-            <li>Пункт 1.2: Текст текст текст...</li>
-          </ul>
-          <p class="follow-up">У вас остались ещё какие-то вопросы?</p>
-        </div>
-
-        <div class="message user-message">
-          <p>Что такое пункт 2.17</p>
+        <!-- Динамически отображаем сообщения из массива messages -->
+        <div
+          v-for="(message, index) in messages"
+          :key="index"
+          :class="[
+            'message',
+            message.type === 'user' ? 'user-message' : 'ai-message',
+          ]"
+        >
+          <div v-if="message.type === 'ai'" class="ai-label">AI</div>
+          <div v-html="message.content"></div>
         </div>
 
         <div class="input-area">
-          <input
-            type="text"
-            placeholder="Введите свой вопрос..."
-            class="question-input"
-          />
+          <div class="input-wrapper">
+            <textarea
+              v-model="userInput"
+              placeholder="Введите свой вопрос..."
+              class="question-input"
+              @keyup.enter="sendMessage"
+              :disabled="isLoading"
+            ></textarea>
+            <button
+              @click="sendMessage"
+              :disabled="isLoading"
+              class="send-button"
+            >
+              <svg
+                class="send-icon"
+                viewBox="0 0 24 24"
+                fill="none"
+                xmlns="http://www.w3.org/2000/svg"
+              >
+                <path
+                  d="M12 19V5M12 5L5 12M12 5L19 12"
+                  stroke="#706F6F"
+                  stroke-width="2"
+                  stroke-linecap="round"
+                  stroke-linejoin="round"
+                />
+              </svg>
+            </button>
+          </div>
         </div>
       </div>
     </div>
@@ -52,8 +64,81 @@
 </template>
 
 <script>
+import axios from "axios";
+
 export default {
   name: "Aiconsult",
+  data() {
+    return {
+      messages: [
+        {
+          type: "ai",
+          content: "Здравствуйте! Я ваш AI-консультант. Чем могу помочь?",
+        },
+      ],
+      userInput: "",
+      isLoading: false,
+      apiKey: "YOUR_API_KEY", // Замените на ваш реальный API ключ
+      apiEndpoint: "https://api.openai.com/v1/chat/completions", // Для OpenAI
+    };
+  },
+  methods: {
+    async sendMessage() {
+      if (!this.userInput.trim()) return;
+
+      // Добавляем сообщение пользователя
+      this.messages.push({
+        type: "user",
+        content: this.userInput,
+      });
+
+      const userMessage = this.userInput;
+      this.userInput = "";
+      this.isLoading = true;
+
+      try {
+        // Отправляем запрос к API
+        const response = await axios.post(
+          this.apiEndpoint,
+          {
+            model: "gpt-3.5-turbo", // или другая модель
+            messages: [
+              {
+                role: "system",
+                content:
+                  "Ты полезный AI-консультант, который помогает клиентам с вопросами о договорах и услугах Эр-Телеком. Отвечай вежливо и профессионально.",
+              },
+              {
+                role: "user",
+                content: userMessage,
+              },
+            ],
+            temperature: 0.7,
+          },
+          {
+            headers: {
+              Authorization: `Bearer ${this.apiKey}`,
+              "Content-Type": "application/json",
+            },
+          }
+        );
+
+        // Добавляем ответ AI
+        this.messages.push({
+          type: "ai",
+          content: response.data.choices[0].message.content,
+        });
+      } catch (error) {
+        console.error("Ошибка при запросе к API:", error);
+        this.messages.push({
+          type: "ai",
+          content: "Извините, произошла ошибка. Пожалуйста, попробуйте позже.",
+        });
+      } finally {
+        this.isLoading = false;
+      }
+    },
+  },
 };
 </script>
 
@@ -76,6 +161,7 @@ export default {
 .chat-container {
   background: transparent;
   padding: 20px;
+  padding-bottom: 100px;
 }
 
 .ai-header {
@@ -91,7 +177,7 @@ export default {
 
 .message {
   padding: 12px 16px;
-  border-radius: 8px;
+  border-radius: 20px;
   margin-bottom: 12px;
   max-width: 85%;
 }
@@ -132,23 +218,40 @@ export default {
 }
 
 .input-area {
-  margin-top: 30px;
-  padding-top: 20px;
+  position: fixed; /* Закрепляем поле ввода внизу экрана */
+  bottom: 0;
+  left: 50%;
+  transform: translateX(-50%); /* Центрируем по горизонтали */
+  max-width: 800px; /* Ограничиваем ширину по ширине контейнера */
+  width: calc(100% - 40px); /* Учитываем отступы */
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 10px 20px;
+  background-color: #ffffff;
   border-top: 1px solid #e0e0e0;
+  z-index: 10; /* Убедитесь, что поле ввода находится поверх других элементов */
+  box-sizing: border-box; /* Включаем padding и border в ширину */
+}
+
+.input-wrapper {
+  position: relative;
+  width: 100%; /* Убираем ограничение по ширине */
 }
 
 .question-input {
-  width: 100%;
+  width: 100%; /* Убираем ограничение по ширине */
+  height: 89px;
   padding: 12px 16px;
+  padding-right: 60px;
+  background-color: #ededed;
   border: 1px solid #ddd;
-  border-radius: 24px;
+  border-radius: 20px;
   font-size: 14px;
   outline: none;
   transition: border 0.2s;
-}
-
-.question-input:focus {
-  border-color: #1976d2;
+  resize: none;
+  box-sizing: border-box;
 }
 
 .side-image {
@@ -175,6 +278,31 @@ export default {
   width: auto;
   object-fit: contain;
   opacity: 1;
+}
+
+.send-button {
+  position: absolute;
+  right: 10px;
+  bottom: 10px;
+  width: 40px;
+  height: 40px;
+  background-color: #ffffff;
+  border: none;
+  border-radius: 50%;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: background-color 0.2s;
+}
+
+.send-button:disabled {
+  background-color: #b0bec5;
+  cursor: not-allowed;
+}
+
+.send-button svg {
+  margin-left: 2px;
 }
 
 @media (max-width: 1200px) {

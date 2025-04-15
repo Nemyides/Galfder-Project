@@ -8,11 +8,18 @@
 
       <div class="upload-field">
         <div class="document-card">
-          <p class="document-title">
+          <input
+            type="file"
+            id="file-upload"
+            accept=".doc,.docx,.pdf,.odt"
+            @change="handleFileUpload"
+            style="display: none"
+          />
+          <label for="file-upload" class="document-title">
             Рекомендуемые форматы документа:<br />.DOC, .DOCX, .PDF, .ODT
-          </p>
+          </label>
         </div>
-        <button class="upload-button">
+        <button class="upload-button" @click="triggerFileInput">
           <img src="@/assets/loading.svg" alt="Загрузить" />
         </button>
       </div>
@@ -21,12 +28,69 @@
 </template>
 
 <script>
+import mammoth from "mammoth";
+
 export default {
   name: "Check",
+  methods: {
+    triggerFileInput() {
+      document.getElementById("file-upload").click();
+    },
+    async handleFileUpload(event) {
+      const file = event.target.files[0];
+      if (!file) return;
+
+      let fileData = {
+        file: file,
+        url: URL.createObjectURL(file),
+        type: null,
+        content: "",
+      };
+
+      // Определяем тип файла
+      if (file.type === "application/pdf") {
+        fileData.type = "pdf";
+      } else if (file.name.endsWith(".docx") || file.name.endsWith(".doc")) {
+        fileData.type = "word";
+        fileData.content = await this.parseWordFile(file);
+      } else {
+        fileData.type = "unsupported";
+      }
+
+      this.$emit("file-uploaded", fileData);
+    },
+
+    async parseWordFile(file) {
+      try {
+        if (file.name.endsWith(".docx")) {
+          const result = await mammoth.extractRawText({
+            arrayBuffer: await file.arrayBuffer(),
+          });
+          return result.value.replace(/\n/g, "<br>");
+        } else {
+          const text = await this.readFileAsText(file);
+          return text.replace(/\n/g, "<br>");
+        }
+      } catch (error) {
+        console.error("Ошибка чтения Word файла:", error);
+        return "Не удалось прочитать содержимое документа";
+      }
+    },
+
+    readFileAsText(file) {
+      return new Promise((resolve) => {
+        const reader = new FileReader();
+        reader.onload = (e) => resolve(e.target.result);
+        reader.onerror = () => resolve("Не удалось прочитать файл");
+        reader.readAsText(file);
+      });
+    },
+  },
 };
 </script>
 
 <style scoped>
+/* Стили остаются такими же, как в вашем исходном коде */
 .document-upload-container {
   width: 50%;
   padding-right: 20px;
@@ -53,13 +117,15 @@ export default {
   margin-bottom: 20px;
   text-align: center;
   font-weight: bold;
+  margin-left: -70px;
 }
 
 .upload-field {
   display: flex;
   align-items: center;
   width: 100%;
-  max-width: 350px;
+  max-width: 300px;
+  margin-left: -70px;
 }
 
 .document-card {
@@ -75,7 +141,7 @@ export default {
 .document-title {
   font-size: 11px;
   color: #7f7f7f;
-  margin-bottom: 15px;
+  cursor: pointer;
 }
 
 .upload-button {

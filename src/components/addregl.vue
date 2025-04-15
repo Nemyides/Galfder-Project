@@ -8,11 +8,18 @@
 
       <div class="upload-field">
         <div class="document-card">
-          <p class="document-title">
+          <input
+            type="file"
+            id="file-upload"
+            accept=".doc,.docx,.pdf,.odt"
+            @change="handleFileUpload"
+            style="display: none"
+          />
+          <label for="file-upload" class="document-title">
             Рекомендуемые форматы документа:<br />.DOC, .DOCX, .PDF, .ODT
-          </p>
+          </label>
         </div>
-        <button type="button" class="upload-button" @click="showModal = true">
+        <button type="button" class="upload-button" @click="triggerFileInput">
           <img src="@/assets/loading.svg" alt="Загрузить" />
         </button>
       </div>
@@ -37,12 +44,98 @@
 </template>
 
 <script>
+import mammoth from "mammoth";
+
 export default {
   name: "Addregl",
   data() {
     return {
-      showModal: false, // Добавляем состояние для управления модальным окном
+      showModal: false,
     };
+  },
+  methods: {
+    triggerFileInput() {
+      document.getElementById("file-upload").click();
+    },
+    async handleFileUpload(event) {
+      const file = event.target.files[0];
+      if (!file) return;
+
+      // Проверяем тип файла
+      const validTypes = [
+        "application/pdf",
+        "application/msword",
+        "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+        "application/vnd.oasis.opendocument.text",
+      ];
+
+      if (
+        !validTypes.includes(file.type) &&
+        !file.name.match(/\.(doc|docx|pdf|odt)$/i)
+      ) {
+        alert(
+          "Пожалуйста, выберите файл одного из поддерживаемых форматов: .doc, .docx, .pdf, .odt"
+        );
+        return;
+      }
+
+      try {
+        // Здесь можно добавить код для отправки файла на сервер
+        // Имитируем загрузку
+        await new Promise((resolve) => setTimeout(resolve, 1000));
+
+        // Показываем модальное окно после успешной загрузки
+        this.showModal = true;
+
+        // Можно добавить обработку файла как в компоненте Check
+        const fileData = {
+          file: file,
+          url: URL.createObjectURL(file),
+          type: this.getFileType(file),
+          content: await this.parseFileContent(file),
+        };
+
+        this.$emit("file-uploaded", fileData);
+      } catch (error) {
+        console.error("Ошибка при загрузке файла:", error);
+        alert("Произошла ошибка при загрузке файла");
+      }
+    },
+
+    getFileType(file) {
+      if (file.type === "application/pdf") return "pdf";
+      if (file.name.endsWith(".docx") || file.name.endsWith(".doc"))
+        return "word";
+      if (file.name.endsWith(".odt")) return "odt";
+      return "unsupported";
+    },
+
+    async parseFileContent(file) {
+      try {
+        if (file.name.endsWith(".docx")) {
+          const result = await mammoth.extractRawText({
+            arrayBuffer: await file.arrayBuffer(),
+          });
+          return result.value.replace(/\n/g, "<br>");
+        } else if (file.name.endsWith(".doc") || file.name.endsWith(".odt")) {
+          const text = await this.readFileAsText(file);
+          return text.replace(/\n/g, "<br>");
+        }
+        return ""; // Для PDF не извлекаем текст
+      } catch (error) {
+        console.error("Ошибка чтения файла:", error);
+        return "Не удалось прочитать содержимое документа";
+      }
+    },
+
+    readFileAsText(file) {
+      return new Promise((resolve) => {
+        const reader = new FileReader();
+        reader.onload = (e) => resolve(e.target.result);
+        reader.onerror = () => resolve("Не удалось прочитать файл");
+        reader.readAsText(file);
+      });
+    },
   },
 };
 </script>
@@ -74,20 +167,22 @@ export default {
   margin-bottom: 20px;
   text-align: center;
   font-weight: bold;
+  margin-left: -70px;
 }
 
 .upload-field {
   display: flex;
   align-items: center;
   width: 100%;
-  max-width: 350px;
+  max-width: 300px;
+  margin-left: -70px;
 }
 
 .document-card {
   border: 2px solid #185493;
   border-radius: 15px;
   width: 250px;
-  height: 40px;
+  min-height: 40px;
   padding: 0 10px;
   background-color: #f9f9f9;
   text-align: left;
@@ -96,7 +191,7 @@ export default {
 .document-title {
   font-size: 11px;
   color: #7f7f7f;
-  margin-bottom: 15px;
+  cursor: pointer;
 }
 
 .upload-button {

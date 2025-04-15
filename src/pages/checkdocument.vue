@@ -1,18 +1,37 @@
 <template>
   <div id="app">
     <div class="main-content">
-      <Check></Check>
+      <Check @file-uploaded="handleFileUpload"></Check>
+      <DocumentViewer
+        :file-data="fileData"
+        @clear-document="clearDocument"
+      ></DocumentViewer>
     </div>
   </div>
 </template>
 
 <script>
 import Check from "@/components/check.vue";
+import DocumentViewer from "@/components/documentViewer.vue";
 
 export default {
   name: "app",
   components: {
     Check,
+    DocumentViewer,
+  },
+  data() {
+    return {
+      fileData: null,
+    };
+  },
+  methods: {
+    handleFileUpload(fileData) {
+      this.fileData = fileData;
+    },
+    clearDocument() {
+      this.fileData = null;
+    },
   },
 };
 </script>
